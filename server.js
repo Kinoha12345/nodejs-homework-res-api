@@ -1,5 +1,17 @@
 const app = require('./app')
+const express = require("express");
+const morgan = require("morgan");
+require("dotenv").config();
 
-app.listen(3000, () => {
-  console.log("Server running. Use our API on port: 3000")
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+app.use(morgan("tiny"));
+
+app.listen(PORT, (err) => {
+  if (err) {
+    return console.log("Sry, we have a problem:", err);
+  }
+  console.log(`Server running. Use our API on port: ${PORT}`)
 })
