@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
 const ERROR_MESSAGE = require('../../err_message/err_message')
 const Contact = require('../../db/contacts')
 
