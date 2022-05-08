@@ -1,29 +1,35 @@
 const express = require('express');
-
 const router = express.Router();
 const fs = require('fs');
-const funContacts = require('../../models/contacts');
 const ERROR_MESSAGE = require('../../err_message/err_message')
 const {addValid} = require('../../middlewares/joi');
-
-const contacts = JSON.parse(
-  fs.readFileSync('../../models/contacts.json', {encoding: 'utf-8'}),
-)
+const Contact = require('../../db/contacts')
 
 router.get('/', async (req, res, next) => {
-  const contactList = await funContacts.listContacts();
-  res.status(200).json( contactList);
+  try {
+        const contactList = await Contact.find();
+        res.status(200).json(contactList);
+        console.log(contactList);
+      } catch (error){
+        res.status(400).json({message: ERROR_MESSAGE.NOT_FOUND});
+  }
   next();
 })
 
 router.get('/:contactId', async (req, res, next) => {
   const contactId = req.params.contactId;
-  const findContact = await funContacts.getContactById(Number(contactId), ERROR_MESSAGE.NOT_FOUND)
-  if (!findContact) {
-    return res.status(404).json({message: ERROR_MESSAGE.NOT_FOUND})
-  }
 
-  res.status(200).json({findContact})
+  Contact.findOne({ _id: contactId})
+  .then(foundContact => {
+    if (!foundContact) {
+      return res.status(404).json({
+        message: ERROR_MESSAGE.NOT_FOUND,
+      })
+    }
+    res.status(200).json({ found_contact: foundContact})
+  })
+  .catch (error => res.status(400).json({error: error}))
+
   next();
 })
 
@@ -35,44 +41,76 @@ router.post('/', addValid, async (req, res, next) => {
       message: ERROR_MESSAGE.MISSING_FIELD
     })
   }
-
-  const addContact = await funContacts.addContact(name, email, phone)
-  res.status(201).json(addContact);
+  try {
+    const addContact = new Contact({name, email, phone})
+    const updateContact = await addContact.save();
+    res.status(200).json({new_contact: addContact})
+  } catch (error) {
+    console.log(error);
+  }
   next();
 })
 
 router.delete('/:contactId', async (req, res, next) => {
   const contactId = req.params.contactId;
 
-  const deleteContact = await funContacts.removeContact(Number(contactId), ERROR_MESSAGE.NOT_FOUND)
-  
-  if (deleteContact.length === contacts.length) {
-    return res.status(400).json({message: ERROR_MESSAGE.NOT_FOUND})
-  }
+  Contact.findOneAndDelete({ _id: contactId })
+    .then(foundContact => {
+      if (!foundContact) {
+        return res.status(404).json({ message: ERROR_MESSAGE.NOT_FOUND })
+      }
 
-  res.status(200).json({message: 'Contact delete'})
+      res.json({
+        found_contact: foundContact,
+        message: "Contact delete!",
+      })
+    })
+    .catch( error => res.status(400).json({ error: error }))
   next();
 })
 
 router.put('/:contactId', addValid, async (req, res, next) => {
   const contactId = req.params.contactId;
-  const {name, email, phone } = req.body;
+  const newFields = req.body;
+
+  Contact.findOneAndUpdate(
+    { _id: contactId },
+    { $setOnInsert: { ...newFields} },
+    { new: true, upsert: true},
+  )
+    .then(foundContact => {
+      if (!foundContact) {
+        return res.status(404).json({ message: ERROR_MESSAGE.NOT_FOUND })
+      }
+
+      res.json({ found_contact: foundContact })
+    })
+    .catch( error => res.status(400).json({ error: error }))
+  next();
+})
+
+router.patch('/:contactId', (req, res) => {
+  const contactId = req.params.contactId;
+  const newFields = req.body;
+  const {name, email, phone} = newFields;
 
   if (!name || !email || !phone) {
-    return res.status(400).json({ message: ERROR_MESSAGE.MISSING_FIELD})
+    return res.status(400).json({message: ERROR_MESSAGE.MISSING_FIELD})
   }
 
-  const updateContact = await funContacts.updateContact(
-    Number(contactId),
-    name, email, phone,
-    ERROR_MESSAGE.NOT_FOUND
+  Contact.findOneAndUpdate(
+    { _id: contactId },
+    { $set: newFields },
+    { new: true, useFindAndModify: false },
   )
+      .then(foundContact => {
+        if (!foundContact) {
+          return res.status(404).json({ message: ERROR_MESSAGE.NOT_FOUND })
+        }
 
-  if (!updateContact) {
-    return res.status(404).json({message: ERROR_MESSAGE.NOT_FOUND})
-  }
-  res.status(200).json({ message: "Contact update" });
-  next();
+        res.json({ foundContact: foundContact})
+      })
+      .catch(error => res.status(400).json({ error: error }))
 })
 
 module.exports = router
