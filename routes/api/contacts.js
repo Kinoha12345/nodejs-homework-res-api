@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const ERROR_MESSAGE = require('../../err_message/err_message')
-const {addValid} = require('../../middlewares/joi');
 const Contact = require('../../db/contacts')
 
 router.get('/', async (req, res, next) => {
@@ -33,7 +32,7 @@ router.get('/:contactId', async (req, res, next) => {
   next();
 })
 
-router.post('/', addValid, async (req, res, next) => {
+router.post('/', async (req, res, next) => {
   const {name, email, phone} = req.body;
 
   if (!name || !email || !phone) {
@@ -69,7 +68,7 @@ router.delete('/:contactId', async (req, res, next) => {
   next();
 })
 
-router.put('/:contactId', addValid, async (req, res, next) => {
+router.put('/:contactId',  async (req, res, next) => {
   const contactId = req.params.contactId;
   const newFields = req.body;
 
