@@ -1,8 +1,9 @@
+require('dotenv').config()
 const mongoose = require('mongoose');
 
 function dbConnection() {
     mongoose.connect(
-        'mongodb+srv://BETRAYAL:qweqwe123@cluster0.qjj8f.mongodb.net/db-contacts?retryWrites=true&w=majority',
+        process.env.URI,
         err => {
             if (err) {
                 console.log('err: ', err);
