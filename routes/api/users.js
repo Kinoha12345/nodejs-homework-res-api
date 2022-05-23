@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const  User  = require('../../db/users')
+const UploadService = require('../../services/file-upload')
 const { Conflict, Unauthorized } = require('http-errors');
+const upload = require('../../helpers/uploads')
 const jwt = require('jsonwebtoken')
 const {authentication} = require('../../middlewares/authenticate')
-
 const {SECRET} = process.env
-
+require('dotenv').config()
 
 
 router.post('/signup', async (req, res, next) => {
@@ -84,6 +85,25 @@ router.patch('/', authentication, async (req, res, next) => {
         code: 200,
         message: `new Subscription: ${subscription}`,
         data: {User: { email, subscription } }
+    })
+})
+
+router.patch('/avatar', authentication, upload.single('avatarURL'), async (req, res, next) => { 
+    const id = String(req.user._id)
+    const file = req.file
+    const AVATAR_OF_USERS = process.env.AVATAR_OF_USERS
+    const destination = path.join(AVATAR_OF_USERS, id)
+    await mkdrip(destination)
+    const uploadService = new UploadService
+    const avatarURL = await uploadService.save(file, id)
+    await User.updateOne({ _id: id }, { avatarURL })
+
+    return res.status(200).json({
+        status: 'success',
+    code: 200,
+    date: {
+      avatarURL,
+    },
     })
 })
 
