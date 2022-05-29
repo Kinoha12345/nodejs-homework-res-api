@@ -6,13 +6,16 @@ const { Conflict, Unauthorized } = require('http-errors');
 const upload = require('../../helpers/uploads')
 const jwt = require('jsonwebtoken')
 const {authentication} = require('../../middlewares/authenticate')
-const {SECRET} = process.env
+const EmailService = require('../../services/email/service')
+const { CreateSenderNodemailer } = require('../../services/email/sender')
 require('dotenv').config()
+const {SECRET} = process.env
+
 
 
 router.post('/signup', async (req, res, next) => {
     try {
-        const {email, password, subscription = 'starter' } = req.body;
+        const {name, email, password, subscription = 'starter' } = req.body;
         const user = await User.findOne({email})
         
 
@@ -20,13 +23,36 @@ router.post('/signup', async (req, res, next) => {
             throw new Conflict('Email in use')
         }
 
-        const newUser = new User({email, subscription})
-        newUser.setPassword(password)
-        newUser.save()
+        // const newUser = new User({email, subscription})
+        // newUser.setPassword(password)
+        // newUser.save()
+
+        const newUser = await Users.create({
+            name,
+            email,
+            password,
+            subscription,
+          })
         
+        const emailService = new EmailService(
+            process.env.NODE_ENV,
+            new CreateSenderNodemailer(),
+          )
+
+          const statusEmail = await emailService.sendVerifyEmail(
+            newUser.email,
+            newUser.name,
+            newUser.verifyToken,
+          )
+
+
         res.status(201).json({ user: {
-            email: email,
-            subscription: subscription,
+            id: newUser.id,
+            name: newUser.name,
+            email: newUser.email,
+            subscription: newUser.subscription,
+            avatar: newUser.avatar,
+            successEmail: statusEmail,
         }
     })
     } catch (error) {
@@ -106,5 +132,52 @@ router.patch('/avatar', authentication, upload.single('avatarURL'), async (req, 
     },
     })
 })
+
+router.get('/verify/:token', async (req, res, next) => {
+    const user = await User.findOne(req.params.token)
+    if (user) {
+      await User.updateOne(user._id, true, null)
+      return res.status(200).json({
+        status: 'success',
+        code: 200,
+        data: {
+          message: 'Success',
+        },
+      })
+    }
+  
+    return res.status(400).json({
+      status: 'error',
+      code: 400,
+      message: 'Invalid token',
+    })
+  })
+
+
+  router.post('/verify', async (req, res, next) => {
+    const { email } = req.body
+    const user = await User.findOne(email)
+    if (user) {
+      const { email, name, verifyToken } = user
+      const emailService = new EmailService(
+        process.env.NODE_ENV,
+        new CreateSenderNodemailer(),
+      )
+  
+      const statusEmail = await emailService.sendVerifyEmail(
+        email,
+        name,
+        verifyToken,
+      )
+    }
+  
+    return res.status(200).json({
+      status: 'success',
+      code: 200,
+      data: {
+        message: 'Success',
+      },
+    })
+  })
 
 module.exports = router;
